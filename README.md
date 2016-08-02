@@ -24,7 +24,6 @@ New people are always welcome, as long they are easy to deal with and can contri
 * [Crabby](https://github.com/Johnson-A/Crabby), one of the first chess engines implemented in Rust (although not feature complete).
 <br>
 <br>
----------------------------------------
 
 ## <center>Rust Programming Language</center>
 
@@ -59,7 +58,6 @@ Download the software in [rustup.rs](https://www.rustup.rs) and install via `rus
 * Use `#[bench]` tests to check for speed and `mem::size_of::<T>` to check a data structure memory size
 <br>
 <br>
----------------------------------------
 
 ## <center>Implementation</center>
 
@@ -124,7 +122,6 @@ The idea is to first make a working chess playing engine and then focus on makin
 ..- [ ] Cache Line optimizations (try to fit in multiples of 64 bytes)
 <br>
 <br>
----------------------------------------
 
 ## <center>Benchmarks</center>
 

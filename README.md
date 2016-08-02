@@ -1,5 +1,5 @@
 # <center>windmill</center>
-<br>
+
 
 Welcome to windmill, a new chess engine written exclusively in [Rust](https://www.rust-lang.org).
 <br>

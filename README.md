@@ -1,5 +1,4 @@
 # <center>windmill</center>
-
 <br>
 
 Welcome to windmill, a new chess engine written exclusively in [Rust](https://www.rust-lang.org).
@@ -68,18 +67,18 @@ The idea is to first make a working chess playing engine and then focus on makin
 ### First Release
 
 - [ ] Basic Data Structures and Debugging code
-..- [ ] Bitboard data structure and related methods
-..- [ ] Position trait and related data structure (implemented using bitboards)
-..- [ ] Game Info data structure (Moves, Player Names, side to move, castle possibilities, en passent possibilities, etc --- similar to a PGN File)
-..- [ ] FEN and PGN reader/writer
-..- [ ] Move (internal) data structure
-..- [ ] Printing a position and/or game in a readable format in stdout
+  - [ ] Bitboard data structure and related methods
+  - [ ] Position trait and related data structure (implemented using bitboards)
+  - [ ] Game Info data structure (Moves, Player Names, side to move, castle possibilities, en passent possibilities, etc --- similar to a PGN File)
+  - [ ] FEN and PGN reader/writer
+  - [ ] Move (internal) data structure
+  - [ ] Printing a position and/or game in a readable format in stdout
 - [ ] Move Generation (should be defined in Position trait and implemented in position data structure)
-..- [ ] Hash Tables for Knights and Kings
-..- [ ] Sliding pieces (Bishops, Rooks and Queens) using while
-..- [ ] Pawn moves, captures and en passent
-..- [ ] isCheck, isMate, isPositionLegal, etc
-..- [ ] Implement tests with Perft (and also simpler ones, one for each piece/function)
+  - [ ] Hash Tables for Knights and Kings
+  - [ ] Sliding pieces (Bishops, Rooks and Queens) using while
+  - [ ] Pawn moves, captures and en passent
+  - [ ] isCheck, isMate, isPositionLegal, etc
+  - [ ] Implement tests with Perft (and also simpler ones, one for each piece/function)
 - [ ] Basic Position Evaluation (probably just counting material and checking for mate)
 - [ ] Simple Time Management (maybe use a fixed percentage amount)
 - [ ] Move Search using Min-max (Negamax version, single threaded, no optimization)
@@ -90,36 +89,36 @@ The idea is to first make a working chess playing engine and then focus on makin
 ### Enhancements for Future Releases
 
 - [ ] Optimize Move Generation
-..- [ ] Magic Move Generation
-..- [ ] Use intrinsics (and flag `-C target_cpu=native`) to allow for better code optimization during compilation
+  - [ ] Magic Move Generation
+  - [ ] Use intrinsics (and flag `-C target_cpu=native`) to allow for better code optimization during compilation
 
 - [ ] Optimize Move Search
-..- [ ] Alpha-Beta prunning
-..- [ ] Multithreading + thread pool
-..- [ ] Transposition Table (table is static mut using mutex or spinlocks in each entry, then using unsafe + XOR trick)
-..- [ ] Static Exchange Evaluation
-..- [ ] Quiescence Search
-..- [ ] Iterative Deepening
-..- [ ] Principal Variation Search (or negascout)
-..- [ ] Null move prunning
-..- [ ] Late move reduction
-..- [ ] Killer move heuristics
-..- [ ] Aspiration window
-..- [ ] Futility prunning
+  - [ ] Alpha-Beta prunning
+  - [ ] Multithreading + thread pool
+  - [ ] Transposition Table (table is static mut using mutex or spinlocks in each entry, then using unsafe + XOR trick)
+  - [ ] Static Exchange Evaluation
+  - [ ] Quiescence Search
+  - [ ] Iterative Deepening
+  - [ ] Principal Variation Search (or negascout)
+  - [ ] Null move prunning
+  - [ ] Late move reduction
+  - [ ] Killer move heuristics
+  - [ ] Aspiration window
+  - [ ] Futility prunning
 
 - [ ] Optimize Evaluation
-..- [ ] Piece-square score
-..- [ ] Include strategic notions
-..- [ ] Separate evaluation for middlegames and endgames
-..- [ ] Parameter Tuning (maybe using spsa or something similar)
+  - [ ] Piece-square score
+  - [ ] Include strategic notions
+  - [ ] Separate evaluation for middlegames and endgames
+  - [ ] Parameter Tuning (maybe using spsa or something similar)
 
 - [ ] Better Time Management
 
 - [ ] Endgame Tablebase
 
 - [ ] Others
-..- [ ] Faster Hashing for hash tables (maybe use RKISS as RNG)
-..- [ ] Cache Line optimizations (try to fit in multiples of 64 bytes)
+  - [ ] Faster Hashing for hash tables (maybe use RKISS as RNG)
+  - [ ] Cache Line optimizations (try to fit in multiples of 64 bytes)
 <br>
 <br>
 

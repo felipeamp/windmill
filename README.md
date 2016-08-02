@@ -44,7 +44,7 @@ Download the software in [rustup.rs](https://www.rustup.rs) and install via `rus
 
 * Variables should be named according to the [Rust Language Style Guidelines](https://doc.rust-lang.org/style). In general words, this means lines with up to 99 characters, snake_case for modules, crates, functions and local variables; and CamelCase for Types, Traits, Enums and Type Parameters.
 
-* Before commiting code, you should run `rustfmt` in your code. You should also run the appropriate test cases using cargo test.
+* Before commiting code, you should run `rustfmt` in your code. You should also run the appropriate test cases using `cargo test`.
 
 * Avoid implicit type coersion (in the rare cases they are allowed).
 

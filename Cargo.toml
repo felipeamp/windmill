@@ -1,0 +1,6 @@
+[package]
+name = "windmill"
+version = "0.1.0"
+authors = ["felipeamp <felipeamp@gmail.com>"]
+
+[dependencies]

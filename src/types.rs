@@ -35,6 +35,7 @@ pub struct Square(u8);
 /// Prints the square in the human notation (eg: 'e4').
 impl fmt::Display for Square {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        assert!(self.0 < 64u8);
         let file: char = ('h' as u8 - self.0 % 8) as char;
         let rank: char = char::from_digit(1 + (self.0 / 8) as u32, 10).unwrap();
         write!(f, "{}{}", file, rank)
@@ -140,6 +141,20 @@ pub enum Piece {
     King,
 }
 
+impl fmt::Display for Piece {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Piece::Pawn => write!(f, "♙"),
+            Piece::Knight => write!(f, "♘"),
+            Piece::Bishop => write!(f, "♗"),
+            Piece::Rook => write!(f, "♖"),
+            Piece::Queen => write!(f, "♕"),
+            Piece::King => write!(f, "♔"),
+        }
+        
+    }
+}
+
 pub enum Color {
     White,
     Black,
@@ -177,5 +192,15 @@ mod tests {
         assert!(Square::from_string("a0".to_string()).is_err());
         assert!(Square::from_string("a11".to_string()).is_err());
         assert!(Square::from_string(String::new()).is_err());
+    }
+
+    #[test]
+    fn piece_display() {
+        assert_eq!(format!("{}", Piece::Pawn), "♙".to_string());
+        assert_eq!(format!("{}", Piece::Knight), "♘".to_string());
+        assert_eq!(format!("{}", Piece::Bishop), "♗".to_string());
+        assert_eq!(format!("{}", Piece::Rook), "♖".to_string());
+        assert_eq!(format!("{}", Piece::Queen), "♕".to_string());
+        assert_eq!(format!("{}", Piece::King), "♔".to_string());
     }
 }

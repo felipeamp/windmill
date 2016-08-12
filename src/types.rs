@@ -13,6 +13,62 @@ use std::char;
 use std::fmt;
 use std::iter::Iterator;
 
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum File {
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,
+    H,
+}
+
+impl fmt::Display for File {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            File::A => write!(f, "a"),
+            File::B => write!(f, "b"),
+            File::C => write!(f, "c"),
+            File::D => write!(f, "d"),
+            File::E => write!(f, "e"),
+            File::F => write!(f, "f"),
+            File::G => write!(f, "g"),
+            File::H => write!(f, "h"),
+        }
+    }
+}
+
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Rank {
+    _1,
+    _2,
+    _3,
+    _4,
+    _5,
+    _6,
+    _7,
+    _8,
+}
+
+impl fmt::Display for Rank {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Rank::_1 => write!(f, "1"),
+            Rank::_2 => write!(f, "2"),
+            Rank::_3 => write!(f, "3"),
+            Rank::_4 => write!(f, "4"),
+            Rank::_5 => write!(f, "5"),
+            Rank::_6 => write!(f, "6"),
+            Rank::_7 => write!(f, "7"),
+            Rank::_8 => write!(f, "8"),
+        }
+    }
+}
+
 /// Struct for square notation. Should be between 0 (h1) and 63 (a8)
 ///
 /// Since we still can't implement a trait for a type alias, we need
@@ -31,17 +87,36 @@ use std::iter::Iterator;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Square(u8);
 
-/// Prints the square in the human notation (eg: 'e4').
-impl fmt::Display for Square {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        assert!(self.0 < 64u8);
-        let file: char = ('h' as u8 - self.0 % 8) as char;
-        let rank: char = char::from_digit(1 + (self.0 / 8) as u32, 10).unwrap();
-        write!(f, "{}{}", file, rank)
-    }
-}
-
 impl Square {
+    pub fn file(&self) -> File {
+        match self.0 % 8 {
+            0 => File::H,
+            1 => File::G,
+            2 => File::F,
+            3 => File::E,
+            4 => File::D,
+            5 => File::C,
+            6 => File::B,
+            7 => File::A,
+            _ => panic!("should never get here"),
+        }
+    }
+
+    pub fn rank(&self) -> Rank {
+        assert!(self.0 < 64);
+        match self.0 / 8 {
+            0 => Rank::_1,
+            1 => Rank::_2,
+            2 => Rank::_3,
+            3 => Rank::_4,
+            4 => Rank::_5,
+            5 => Rank::_6,
+            6 => Rank::_7,
+            7 => Rank::_8,
+            _ => panic!("Invalid rank (> 8)"),
+        }
+    }
+
     /// If the input string is a valid square, creates the corresponding `Square`
     /// struct inside a `Result`.
     ///
@@ -70,6 +145,14 @@ impl Square {
     }
 }
 
+/// Prints the square in the human notation (eg: 'e4').
+impl fmt::Display for Square {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        assert!(self.0 < 64u8);
+        write!(f, "{}{}", self.file(), self.rank())
+    }
+}
+
 /// Type for move notation.
 ///
 /// bits  0- 5: origin square (from 0 to 63)
@@ -85,14 +168,93 @@ pub struct Move(u16);
 
 /// Empty/Null `Move`
 pub const NULL_MOVE: Move = Move(0);
+pub const PROMOTION_FLAG: u16 = 1 << 14;
+pub const EN_PASSENT_FLAG: u16 = 1 << 15;
+pub const CASTLING_FLAG: u16 = 0b11 << 14;
 
-// TODO: implement methods to edit moves and to get the information inside.
+// TODO: implement methods (and their documentation) to edit moves and to get the
+// information inside. Only use bitwise operations, avoid creating Square, Rank and File enums
+// (it is ok to use them if they were an argument to the method)
 impl Move {
-    pub fn from(&self) -> Square {
+    pub fn new(from_sq: Square, to_sq: Square, promoted_piece: Piece, castle_side: CastleSide,
+               is_en_passent: bool) -> Move {
+        assert!(from_sq.0 < 64);
+        assert!(to_sq.0 < 64);
+        let mut ret = Move(from_sq.0 as u16 | ((to_sq.0 as u16) << 6 ));
+        match promoted_piece {
+            Piece::None => (),
+            Piece::Knight => ret.0 |= PROMOTION_FLAG,
+            Piece::Bishop => ret.0 |= (1 << 12) | PROMOTION_FLAG,
+            Piece::Rook => ret.0 |= (2 << 12) | PROMOTION_FLAG,
+            Piece::Queen => ret.0 |= (3 << 12) | PROMOTION_FLAG,
+            piece @ _ => panic!(format!("Invalid promoted piece: {}", piece)),
+        }
+        match castle_side {
+            CastleSide::None => (),
+            CastleSide::Kingside | CastleSide::Queenside => ret.0 |= CASTLING_FLAG,
+        }
+        if is_en_passent {
+            ret.0 |= EN_PASSENT_FLAG;
+        }
+        ret
+    }
+
+    pub fn is_valid_move(&self) -> bool {
+        let from_sq = self.from_sq();
+        let to_sq = self.to_sq();
+        let from_sq_rank = from_sq.rank();
+        let from_sq_file = from_sq.file();
+        let to_sq_rank = to_sq.rank();
+        let to_sq_file = to_sq.file();
+        let castle_side = self.castle_side();
+        let is_castle = self.is_castle();
+        let is_promotion = self.is_promotion();
+        let is_en_passent = self.is_en_passent();
+        // Wrong promotion squares
+        if is_promotion &&
+            ((from_sq_rank != Rank::_2 && from_sq_rank != Rank::_7) ||
+             (to_sq_rank != Rank::_1 && to_sq_rank != Rank::_8)) {
+            return false;
+        }
+        // Wrong castle squares
+        if is_castle &&
+            ((from_sq_rank != Rank::_1 && from_sq_rank != Rank::_8) ||
+             (to_sq_rank != Rank::_1 && to_sq_rank != Rank::_8) ||
+             from_sq_file != File::E ||
+             (to_sq_file != File::C && to_sq_file != File::G)) {
+            return false;
+        }
+        // Wrong castle side
+        if is_castle &&
+            ((castle_side == CastleSide::Kingside && to_sq_file != File::G) ||
+             (castle_side == CastleSide::Queenside && to_sq_file != File::C)) {
+            return false;
+        }
+        // Wrong en passent squares
+        if is_en_passent &&
+            ((from_sq_rank != Rank::_4 && from_sq_rank != Rank::_5) ||
+             (to_sq_rank == Rank::_3 && to_sq_rank != Rank::_6)) {
+            return false;
+        }
+        // Incompatible flags
+        if (is_en_passent && is_castle) ||
+            (is_en_passent && is_promotion) ||
+            (is_castle && is_promotion) {
+            return false;
+        }
+        // No promotion flag with promoting piece
+        if !is_en_passent && (self.0 & (0b11 << 12)) != 0 {
+            return false;
+        }
+        // Same from and to squares
+        from_sq != to_sq
+    }
+
+    pub fn from_sq(&self) -> Square {
         unimplemented!();
     }
 
-    pub fn to(&self) -> Square {
+    pub fn to_sq(&self) -> Square {
         unimplemented!();
     }
 
@@ -108,12 +270,22 @@ impl Move {
         unimplemented!();
     }
 
+    pub fn castle_side(&self) -> CastleSide {
+        // se flag for nula, retorna CastleSide::None, senão retorna pela coluna que foi.
+        unimplemented!();
+    }
+
     pub fn promoted_piece(&self) -> Piece {
+        // se flag de promoção for false, retorna Piece::None, senão retorna pelo match
+        // cuidado pois o cavalo tem entrada 0, que é igual a quando não é promoção
         unimplemented!();
     }
 }
 
+
+
 /// Queue of four killer moves. The first entry is the newest.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Killer(pub Move, pub Move, pub Move, pub Move);
 
 /// Empty killer moves' list.
@@ -129,7 +301,9 @@ impl Killer {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Piece {
+    None,
     Pawn,
     Knight,
     Bishop,
@@ -147,17 +321,21 @@ impl fmt::Display for Piece {
             Piece::Rook => write!(f, "♖"),
             Piece::Queen => write!(f, "♕"),
             Piece::King => write!(f, "♔"),
+            _ => write!(f, ""),
         }
 
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Color {
     White,
     Black,
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum CastleSide {
+    None,
     Kingside,
     Queenside,
 }
@@ -167,6 +345,7 @@ impl fmt::Display for CastleSide {
         match *self {
             CastleSide::Kingside => write!(f, "O-O"),
             CastleSide::Queenside => write!(f, "O-O-O"),
+            _ => write!(f, ""),
         }
 
     }
@@ -176,6 +355,57 @@ impl fmt::Display for CastleSide {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rank_display() {
+        assert_eq!(format!("{}", Rank::_1), "1");
+        assert_eq!(format!("{}", Rank::_2), "2");
+        assert_eq!(format!("{}", Rank::_3), "3");
+        assert_eq!(format!("{}", Rank::_4), "4");
+        assert_eq!(format!("{}", Rank::_5), "5");
+        assert_eq!(format!("{}", Rank::_6), "6");
+        assert_eq!(format!("{}", Rank::_7), "7");
+        assert_eq!(format!("{}", Rank::_8), "8");
+    }
+
+    #[test]
+    fn file_display() {
+        assert_eq!(format!("{}", File::A), "a");
+        assert_eq!(format!("{}", File::B), "b");
+        assert_eq!(format!("{}", File::C), "c");
+        assert_eq!(format!("{}", File::D), "d");
+        assert_eq!(format!("{}", File::E), "e");
+        assert_eq!(format!("{}", File::F), "f");
+        assert_eq!(format!("{}", File::G), "g");
+        assert_eq!(format!("{}", File::H), "h");
+    }
+
+    #[test]
+    #[should_panic]
+    fn move_creation() {
+        unimplemented!();
+        // lance vazio
+        // lance com cada um dos squares com valor grande demais (> 63) -> panic
+        // lance normal
+        // en passent com as 2 cores
+        // roque pros 2 lados com as 2 cores
+        // promoção pra todos os tipos de peça
+        // promoção com captura
+    }
+
+    #[test]
+    #[should_panic]
+    fn move_is_valid() {
+        unimplemented!();
+        // cada um dos lances acima deveria passar, exceto vazio e square errado (panic)
+        // lance com de e para iguais (não nulos)
+        // roque de e para a casa (rank & file) errada, pros 2 lados com as 2 cores
+        // en passent de e para a casa(rank & file) errada, pros 2 lados com as 2 cores
+        // promoção de e para a casa (rank) errada
+        // mistura de flags impossíveis (en passent + castle,
+        // en passent + promotion, castle + promotion, todos)
+        // não promoção com peça de promoção não nula
+    }
 
     #[test]
     fn square_display() {
@@ -199,6 +429,12 @@ mod tests {
         assert!(Square::from_string("a0".to_string()).is_err());
         assert!(Square::from_string("a11".to_string()).is_err());
         assert!(Square::from_string(String::new()).is_err());
+    }
+
+    #[test]
+    #[should_panic]
+    fn move_display() {
+        unimplemented!();
     }
 
     #[test]

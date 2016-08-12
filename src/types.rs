@@ -13,7 +13,6 @@ use std::char;
 use std::fmt;
 use std::iter::Iterator;
 
-
 /// Struct for square notation. Should be between 0 (h1) and 63 (a8)
 ///
 /// Since we still can't implement a trait for a type alias, we need
@@ -41,7 +40,6 @@ impl fmt::Display for Square {
         write!(f, "{}{}", file, rank)
     }
 }
-
 
 impl Square {
     /// If the input string is a valid square, creates the corresponding `Square`
@@ -85,11 +83,10 @@ impl Square {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Move(u16);
 
-// TODO: implement methods to edit moves and to get the information inside.
-
 /// Empty/Null `Move`
 pub const NULL_MOVE: Move = Move(0);
 
+// TODO: implement methods to edit moves and to get the information inside.
 impl Move {
     pub fn from(&self) -> Square {
         unimplemented!();
@@ -116,17 +113,17 @@ impl Move {
     }
 }
 
-
-/// Queue of two killer moves. The first entry is the newest.
-pub struct Killer(pub Move, pub Move);
-
+/// Queue of four killer moves. The first entry is the newest.
+pub struct Killer(pub Move, pub Move, pub Move, pub Move);
 
 /// Empty killer moves' list.
-pub const EMPTY_KILLER: Killer = Killer(NULL_MOVE, NULL_MOVE);
+pub const EMPTY_KILLER: Killer = Killer(NULL_MOVE, NULL_MOVE, NULL_MOVE, NULL_MOVE);
 
 impl Killer {
     /// Inserts a new move in the first position of the Killer Move queue.
     pub fn insert(&mut self, new_killer_move: Move) {
+        self.3 = self.2;
+        self.2 = self.1;
         self.1 = self.0;
         self.0 = new_killer_move;
     }
@@ -151,7 +148,7 @@ impl fmt::Display for Piece {
             Piece::Queen => write!(f, "♕"),
             Piece::King => write!(f, "♔"),
         }
-        
+
     }
 }
 
@@ -163,6 +160,16 @@ pub enum Color {
 pub enum CastleSide {
     Kingside,
     Queenside,
+}
+
+impl fmt::Display for CastleSide {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            CastleSide::Kingside => write!(f, "O-O"),
+            CastleSide::Queenside => write!(f, "O-O-O"),
+        }
+
+    }
 }
 
 
@@ -179,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn square_from_string_ok() {
+    fn square_from_string() {
         assert_eq!(Square(0u8), Square::from_string("h1".to_string()).unwrap());
         assert_eq!(Square(7u8), Square::from_string("a1".to_string()).unwrap());
         assert_eq!(Square(8u8), Square::from_string("h2".to_string()).unwrap());
@@ -202,5 +209,11 @@ mod tests {
         assert_eq!(format!("{}", Piece::Rook), "♖".to_string());
         assert_eq!(format!("{}", Piece::Queen), "♕".to_string());
         assert_eq!(format!("{}", Piece::King), "♔".to_string());
+    }
+
+    #[test]
+    fn castleside_display() {
+        assert_eq!(format!("{}", CastleSide::Kingside), "O-O".to_string());
+        assert_eq!(format!("{}", CastleSide::Queenside), "O-O-O".to_string());
     }
 }

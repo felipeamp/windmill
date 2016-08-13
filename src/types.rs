@@ -69,7 +69,7 @@ impl fmt::Display for Rank {
     }
 }
 
-/// Struct for square notation. Should be between 0 (h1) and 63 (a8)
+/// Struct for square notation. Should be between 0 (a1) and 63 (h8)
 ///
 /// Since we still can't implement a trait for a type alias, we need
 /// a tuple struct here. It's not elegant, but it works.
@@ -78,26 +78,26 @@ impl fmt::Display for Rank {
 ///
 /// ```
 /// let sq_h1 = Square(0);
-/// println!("{}", sq_h1) // prints h1
+/// println!("{}", sq_a1) // prints a1
 ///
 /// let sq_a8 = Square(63);
-/// println!("{}", sq_a8) // prints a8
+/// println!("{}", sq_h8) // prints h8
 /// ```
 ///
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Square(u8);
+pub struct Square(pub u8);
 
 impl Square {
     pub fn file(&self) -> File {
         match self.0 % 8 {
-            0 => File::H,
-            1 => File::G,
-            2 => File::F,
-            3 => File::E,
-            4 => File::D,
-            5 => File::C,
-            6 => File::B,
-            7 => File::A,
+            0 => File::A,
+            1 => File::B,
+            2 => File::C,
+            3 => File::D,
+            4 => File::E,
+            5 => File::F,
+            6 => File::G,
+            7 => File::H,
             _ => panic!("should never get here"),
         }
     }
@@ -133,8 +133,8 @@ impl Square {
         }
         let mut ret_u8 = 0u8;
         match input_char_vec[0] {
-            c @ 'a'...'h' => ret_u8 += 7 - (c as u8 - 'a' as u8),
-            c @ 'A'...'H' => ret_u8 += 7 - (c as u8 - 'A' as u8),
+            c @ 'a'...'h' => ret_u8 += c as u8 - 'a' as u8,
+            c @ 'A'...'H' => ret_u8 += c as u8 - 'A' as u8,
             _ => return Err(format!("String \"{}\" is not a legal square name.", input)),
         }
         match input_char_vec[1] {
@@ -142,6 +142,31 @@ impl Square {
             _ => return Err(format!("String \"{}\" is not a legal square name.", input)),
         }
         Ok(Square(ret_u8))
+    }
+
+    pub fn from_file_rank(file: File, rank: Rank) -> Square {
+        let mut ret  = 0u8;
+        match file {
+            File::A => (),
+            File::B => ret += 1,
+            File::C => ret += 2,
+            File::D => ret += 3,
+            File::E => ret += 4,
+            File::F => ret += 5,
+            File::G => ret += 6,
+            File::H => ret += 7,
+        }
+        match rank {
+            Rank::_1 => (),
+            Rank::_2 => ret += 8,
+            Rank::_3 => ret += 16,
+            Rank::_4 => ret += 24,
+            Rank::_5 => ret += 32,
+            Rank::_6 => ret += 40,
+            Rank::_7 => ret += 48,
+            Rank::_8 => ret += 56,
+        }
+        Square(ret)
     }
 }
 
@@ -409,26 +434,38 @@ mod tests {
 
     #[test]
     fn square_display() {
-        assert_eq!(format!("{}", Square(0u8)), "h1");
-        assert_eq!(format!("{}", Square(7u8)), "a1");
-        assert_eq!(format!("{}", Square(8u8)), "h2");
-        assert_eq!(format!("{}", Square(63u8)), "a8");
+        assert_eq!(format!("{}", Square(0u8)), "a1");
+        assert_eq!(format!("{}", Square(7u8)), "h1");
+        assert_eq!(format!("{}", Square(8u8)), "a2");
+        assert_eq!(format!("{}", Square(63u8)), "h8");
     }
 
     #[test]
     fn square_from_string() {
-        assert_eq!(Square(0u8), Square::from_string("h1".to_string()).unwrap());
-        assert_eq!(Square(7u8), Square::from_string("a1".to_string()).unwrap());
-        assert_eq!(Square(8u8), Square::from_string("h2".to_string()).unwrap());
-        assert_eq!(Square(63u8), Square::from_string("a8".to_string()).unwrap());
+        assert_eq!(Square(0u8), Square::from_string("a1".to_string()).unwrap());
+        assert_eq!(Square(7u8), Square::from_string("h1".to_string()).unwrap());
+        assert_eq!(Square(8u8), Square::from_string("a2".to_string()).unwrap());
+        assert_eq!(Square(63u8), Square::from_string("h8".to_string()).unwrap());
 
-        assert_eq!(Square(0u8), Square::from_string("H1".to_string()).unwrap());
-        assert_eq!(Square(7u8), Square::from_string("A1".to_string()).unwrap());
+        assert_eq!(Square(0u8), Square::from_string("A1".to_string()).unwrap());
+        assert_eq!(Square(7u8), Square::from_string("H1".to_string()).unwrap());
 
         assert!(Square::from_string("i1".to_string()).is_err());
         assert!(Square::from_string("a0".to_string()).is_err());
         assert!(Square::from_string("a11".to_string()).is_err());
         assert!(Square::from_string(String::new()).is_err());
+    }
+
+    #[test]
+    fn square_from_file_rank() {
+        assert_eq!(Square(0u8), Square::from_file_rank(File::A, Rank::_1));
+        assert_eq!(Square(9u8), Square::from_file_rank(File::B, Rank::_2));
+        assert_eq!(Square(18u8), Square::from_file_rank(File::C, Rank::_3));
+        assert_eq!(Square(27u8), Square::from_file_rank(File::D, Rank::_4));
+        assert_eq!(Square(36u8), Square::from_file_rank(File::E, Rank::_5));
+        assert_eq!(Square(45u8), Square::from_file_rank(File::F, Rank::_6));
+        assert_eq!(Square(54u8), Square::from_file_rank(File::G, Rank::_7));
+        assert_eq!(Square(63u8), Square::from_file_rank(File::H, Rank::_8));
     }
 
     #[test]

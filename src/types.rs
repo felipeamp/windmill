@@ -388,6 +388,7 @@ impl fmt::Display for CastleSide {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::panic;
 
     #[test]
     fn rank_display() {
@@ -414,36 +415,32 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn move_creation() {
         // lance vazio
         assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::None, CastleSide::None, false), NULL_MOVE);
         // lance normal
-        assert_eq!(Move::new(Square(1u8), Square(2u8), Piece::None, CastleSide::None, false),
-                   Move(1u16 | (2u16 << 6)));
-        assert_eq!(Move::new(Square(6u8), Square(9u8), Piece::None, CastleSide::None, false),
-                   Move(6u16 | (9u16 << 6)));
-        assert_eq!(Move::new(Square(63u8), Square(63u8), Piece::None, CastleSide::None, false),
-                   Move(63u16 | (63u16 << 6)));
+        assert_eq!(Move::new(Square(1u8), Square(2u8), Piece::None, CastleSide::None, false), Move(1u16 | (2u16 << 6)));
+        assert_eq!(Move::new(Square(6u8), Square(9u8), Piece::None, CastleSide::None, false), Move(6u16 | (9u16 << 6)));
+        assert_eq!(Move::new(Square(63u8), Square(63u8), Piece::None, CastleSide::None, false), Move(63u16 | (63u16 << 6)));
         // en passent com as 2 cores
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::None, CastleSide::None, true).0, (1 << 15));
+        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::None, CastleSide::None, true).0, EN_PASSENT_FLAG);
         // roque pros 2 lados com as 2 cores
         assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::None, CastleSide::Kingside, false),
                    Move::new(Square(0u8), Square(0u8), Piece::None, CastleSide::Queenside, false));
         // promoção pra todos os tipos de peça
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Knight, CastleSide::None, false), Move(1 << 14));
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Bishop, CastleSide::None, false), Move((1 << 14) | (1 << 12)));
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Rook, CastleSide::None, false), Move((1 << 14) | (2 << 12)));
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Queen, CastleSide::None, false), Move((1 << 14) | (3 << 12)));
+        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Knight, CastleSide::None, false), Move(PROMOTION_FLAG));
+        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Bishop, CastleSide::None, false), Move(PROMOTION_FLAG | (1 << 12)));
+        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Rook, CastleSide::None, false), Move(PROMOTION_FLAG | (2 << 12)));
+        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Queen, CastleSide::None, false), Move(PROMOTION_FLAG | (3 << 12)));
         // promoção com captura
         // lance com cada um dos squares com valor grande demais (> 63) -> panic
-        panic!(Move::new(Square(64u8), Square(64u8), Piece::None, CastleSide::None, false));
+        assert!(panic::catch_unwind(|| { Move::new(Square(64u8), Square(0u8), Piece::None, CastleSide::None, false) }).is_err());
+        assert!(panic::catch_unwind(|| { Move::new(Square(0u8), Square(64u8), Piece::None, CastleSide::None, false) }).is_err());
+        assert!(panic::catch_unwind(|| { Move::new(Square(255u8), Square(255u8), Piece::None, CastleSide::None, false) }).is_err());
     }
 
     #[test]
-    //#[should_panic]
     fn move_is_valid() {
-        // unimplemented!();
         // cada um dos lances acima deveria passar, exceto vazio e square errado (panic)
         // lance com de e para iguais (não nulos)
         assert!(Move::new(Square(3u8), Square(3u8), Piece::None, CastleSide::None, false).is_valid_move() == false)
@@ -486,7 +483,6 @@ mod tests {
         assert!(Move::new(Square(0), Square(0), Piece::Bishop, CastleSide::None, false).is_promotion() == true);
         assert!(Move::new(Square(0), Square(0), Piece::Rook, CastleSide::None, false).is_promotion() == true);
         assert!(Move::new(Square(0), Square(0), Piece::Queen, CastleSide::None, false).is_promotion() == true);
-
         // Testing using en passent (to test for side effects).
         assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::None, true).is_promotion() == false);
         assert!(Move::new(Square(0), Square(0), Piece::Knight, CastleSide::None, true).is_promotion() == true);

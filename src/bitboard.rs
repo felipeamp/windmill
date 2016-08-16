@@ -48,7 +48,7 @@ impl Bitboard {
     }
 
     pub fn from_squares(squares: &LinkedList<Square>) -> Bitboard {
-        let val = squares.iter().fold(0u64, |acc, &sq| {acc | (1 << sq.0)});
+        let val = squares.iter().fold(0u64, |acc, &sq| acc | (1 << sq.0));
         Bitboard(val)
     }
 
@@ -92,8 +92,7 @@ impl fmt::Display for Bitboard {
             for file in 0..8 {
                 if (self.0 & (1 << (8 * rank + file))) != 0 {
                     s.push_str("| X ");
-                }
-                else {
+                } else {
                     s.push_str("|   ");
                 }
             }
@@ -154,7 +153,7 @@ mod tests {
         squares.push_back(Square::from_file_rank(File::H, Rank::_1));
         squares.push_back(Square::from_file_rank(File::H, Rank::_8));
         {
-            assert_eq!(Bitboard(1 | (1<<7) | (1 << 63)),
+            assert_eq!(Bitboard(1 | (1 << 7) | (1 << 63)),
                        Bitboard::from_squares(&squares));
         }
     }
@@ -179,11 +178,15 @@ mod tests {
 
     #[test]
     fn bitboard_lsb_sq() {
-        assert!(panic::catch_unwind(|| { Bitboard(0).lsb_sq() }).is_err());
-        assert_eq!(Bitboard(1).lsb_sq(), Square::from_file_rank(File::A, Rank::_1));
-        assert_eq!(Bitboard(1 << 8).lsb_sq(), Square::from_file_rank(File::A, Rank::_2));
-        assert_eq!(Bitboard((1 << 8) | 1).lsb_sq(), Square::from_file_rank(File::A, Rank::_1));
-        assert_eq!(Bitboard(!0).lsb_sq(), Square::from_file_rank(File::A, Rank::_1));
+        assert!(panic::catch_unwind(|| Bitboard(0).lsb_sq()).is_err());
+        assert_eq!(Bitboard(1).lsb_sq(),
+                   Square::from_file_rank(File::A, Rank::_1));
+        assert_eq!(Bitboard(1 << 8).lsb_sq(),
+                   Square::from_file_rank(File::A, Rank::_2));
+        assert_eq!(Bitboard((1 << 8) | 1).lsb_sq(),
+                   Square::from_file_rank(File::A, Rank::_1));
+        assert_eq!(Bitboard(!0).lsb_sq(),
+                   Square::from_file_rank(File::A, Rank::_1));
     }
 
     #[test]
@@ -197,11 +200,15 @@ mod tests {
 
     #[test]
     fn bitboard_msb_sq() {
-        assert!(panic::catch_unwind(|| { Bitboard(0).msb_sq() }).is_err());
-        assert_eq!(Bitboard(1).msb_sq(), Square::from_file_rank(File::A, Rank::_1));
-        assert_eq!(Bitboard(1 << 8).msb_sq(), Square::from_file_rank(File::A, Rank::_2));
-        assert_eq!(Bitboard((1 << 8) | 1).msb_sq(), Square::from_file_rank(File::A, Rank::_2));
-        assert_eq!(Bitboard(!0).msb_sq(), Square::from_file_rank(File::H, Rank::_8));
+        assert!(panic::catch_unwind(|| Bitboard(0).msb_sq()).is_err());
+        assert_eq!(Bitboard(1).msb_sq(),
+                   Square::from_file_rank(File::A, Rank::_1));
+        assert_eq!(Bitboard(1 << 8).msb_sq(),
+                   Square::from_file_rank(File::A, Rank::_2));
+        assert_eq!(Bitboard((1 << 8) | 1).msb_sq(),
+                   Square::from_file_rank(File::A, Rank::_2));
+        assert_eq!(Bitboard(!0).msb_sq(),
+                   Square::from_file_rank(File::H, Rank::_8));
     }
 
     #[test]
@@ -210,104 +217,100 @@ mod tests {
         {
             assert_eq!(format!("{}", Bitboard::from_squares(&squares)).len(),
                        BITBOARD_STRING_SIZE);
-            assert_eq!(format!("{}", Bitboard::from_squares(&squares)),
-                {
-                    let mut s = String::with_capacity(BITBOARD_STRING_SIZE);
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s
-                })
+            assert_eq!(format!("{}", Bitboard::from_squares(&squares)), {
+                let mut s = String::with_capacity(BITBOARD_STRING_SIZE);
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s
+            })
         }
         squares.push_back(Square::from_file_rank(File::A, Rank::_1));
         {
-            assert_eq!(format!("{}", Bitboard::from_squares(&squares)),
-                {
-                    let mut s = String::with_capacity(BITBOARD_STRING_SIZE);
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("| X |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s
-                })
+            assert_eq!(format!("{}", Bitboard::from_squares(&squares)), {
+                let mut s = String::with_capacity(BITBOARD_STRING_SIZE);
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("| X |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s
+            })
         }
         squares.push_back(Square::from_file_rank(File::H, Rank::_8));
         squares.push_back(Square::from_file_rank(File::H, Rank::_8));
         {
-            assert_eq!(format!("{}", Bitboard::from_squares(&squares)),
-                {
-                    let mut s = String::with_capacity(BITBOARD_STRING_SIZE);
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   | X |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("| X |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s
-                })
+            assert_eq!(format!("{}", Bitboard::from_squares(&squares)), {
+                let mut s = String::with_capacity(BITBOARD_STRING_SIZE);
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   | X |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("| X |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s
+            })
         }
         squares.push_back(Square::from_file_rank(File::C, Rank::_3));
         {
-            assert_eq!(format!("{}", Bitboard::from_squares(&squares)),
-                {
-                    let mut s = String::with_capacity(BITBOARD_STRING_SIZE);
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   | X |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   | X |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("|   |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s.push_str("| X |   |   |   |   |   |   |   |\n");
-                    s.push_str("+---+---+---+---+---+---+---+---+\n");
-                    s
-                })
+            assert_eq!(format!("{}", Bitboard::from_squares(&squares)), {
+                let mut s = String::with_capacity(BITBOARD_STRING_SIZE);
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   | X |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   | X |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("|   |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s.push_str("| X |   |   |   |   |   |   |   |\n");
+                s.push_str("+---+---+---+---+---+---+---+---+\n");
+                s
+            })
         }
     }
 
@@ -315,9 +318,9 @@ mod tests {
     fn bitboard_iterator() {
         assert_eq!(Bitboard(0).collect::<Vec<_>>(), Vec::new());
         assert_eq!(Bitboard(1).collect::<Vec<_>>(),
-                   vec!(Square::from_file_rank(File::A, Rank::_1)));
+                   vec![Square::from_file_rank(File::A, Rank::_1)]);
         assert_eq!(Bitboard(1 | (1 << 8)).collect::<Vec<_>>(),
-                   vec!(Square::from_file_rank(File::A, Rank::_1),
-                        Square::from_file_rank(File::A, Rank::_2)));
+                   vec![Square::from_file_rank(File::A, Rank::_1),
+                        Square::from_file_rank(File::A, Rank::_2)]);
     }
 }

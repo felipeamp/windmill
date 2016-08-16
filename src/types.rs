@@ -12,6 +12,7 @@ use std::ascii::AsciiExt;
 use std::char;
 use std::fmt;
 use std::iter::Iterator;
+use std::panic;
 
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -145,7 +146,7 @@ impl Square {
     }
 
     pub fn from_file_rank(file: File, rank: Rank) -> Square {
-        let mut ret  = 0u8;
+        let mut ret = 0u8;
         match file {
             File::A => (),
             File::B => ret += 1,
@@ -193,19 +194,20 @@ pub struct Move(u16);
 
 /// Empty/Null `Move`
 pub const NULL_MOVE: Move = Move(0);
-pub const PROMOTION_FLAG: u16 = 1 << 14;
-pub const EN_PASSENT_FLAG: u16 = 1 << 15;
+pub const PROMOTION_FLAG: u16 = 0b01 << 14;
+pub const EN_PASSENT_FLAG: u16 = 0b10 << 14;
 pub const CASTLING_FLAG: u16 = 0b11 << 14;
 
-// TODO: implement methods (and their documentation) to edit moves and to get the
-// information inside. Only use bitwise operations, avoid creating Square, Rank and File enums
-// (it is ok to use them if they were an argument to the method)
 impl Move {
-    pub fn new(from_sq: Square, to_sq: Square, promoted_piece: Piece, castle_side: CastleSide,
-               is_en_passent: bool) -> Move {
+    pub fn new(from_sq: Square,
+               to_sq: Square,
+               promoted_piece: Piece,
+               castle_side: CastleSide,
+               is_en_passent: bool)
+               -> Move {
         assert!(from_sq.0 < 64);
         assert!(to_sq.0 < 64);
-        let mut ret = Move(from_sq.0 as u16 | ((to_sq.0 as u16) << 6 ));
+        let mut ret = Move(from_sq.0 as u16 | ((to_sq.0 as u16) << 6));
         match promoted_piece {
             Piece::None => (),
             Piece::Knight => ret.0 |= PROMOTION_FLAG,
@@ -224,51 +226,68 @@ impl Move {
         ret
     }
 
-    pub fn is_valid_move(&self) -> bool {
+    pub fn is_valid(&self) -> bool {
         let from_sq = self.from_sq();
         let to_sq = self.to_sq();
         let from_sq_rank = from_sq.rank();
         let from_sq_file = from_sq.file();
         let to_sq_rank = to_sq.rank();
         let to_sq_file = to_sq.file();
-        let castle_side = self.castle_side();
+        let castle_side: CastleSide;
+        match panic::catch_unwind(|| self.castle_side()) {
+            Ok(temp_cs) => castle_side = temp_cs,
+            Err(_) => return false,
+        }
         let is_castle = self.is_castle();
         let is_promotion = self.is_promotion();
         let is_en_passent = self.is_en_passent();
         // Wrong promotion squares
         if is_promotion &&
-            ((from_sq_rank != Rank::_2 && from_sq_rank != Rank::_7) ||
-             (to_sq_rank != Rank::_1 && to_sq_rank != Rank::_8)) {
+           ((from_sq_rank != Rank::_2 && from_sq_rank != Rank::_7) ||
+            (to_sq_rank != Rank::_1 && to_sq_rank != Rank::_8)) {
             return false;
         }
         // Wrong castle squares
-        if is_castle &&
-            ((from_sq_rank != Rank::_1 && from_sq_rank != Rank::_8) ||
-             (to_sq_rank != Rank::_1 && to_sq_rank != Rank::_8) ||
-             from_sq_file != File::E ||
-             (to_sq_file != File::C && to_sq_file != File::G)) {
-            return false;
+        if is_castle {
+            if !((from_sq_rank == Rank::_1 && to_sq_rank == Rank::_1) ||
+                 (from_sq_rank == Rank::_8 && to_sq_rank == Rank::_8)) {
+                return false;
+            }
+            if from_sq_file != File::E || (to_sq_file != File::C && to_sq_file != File::G) {
+                return false;
+            }
         }
         // Wrong castle side
         if is_castle &&
-            ((castle_side == CastleSide::Kingside && to_sq_file != File::G) ||
-             (castle_side == CastleSide::Queenside && to_sq_file != File::C)) {
+           ((castle_side == CastleSide::Kingside && to_sq_file != File::G) ||
+            (castle_side == CastleSide::Queenside && to_sq_file != File::C)) {
             return false;
         }
         // Wrong en passent squares
-        if is_en_passent &&
-            ((from_sq_rank != Rank::_4 && from_sq_rank != Rank::_5) ||
-             (to_sq_rank == Rank::_3 && to_sq_rank != Rank::_6)) {
-            return false;
+        if is_en_passent {
+            if !((from_sq_rank == Rank::_4 && to_sq_rank == Rank::_3) ||
+                 (from_sq_rank == Rank::_5 && to_sq_rank == Rank::_6)) {
+                return false;
+            }
+            match from_sq_file {
+                File::A if to_sq_file != File::B => return false,
+                File::B if to_sq_file != File::A && to_sq_file != File::C => return false,
+                File::C if to_sq_file != File::B && to_sq_file != File::D => return false,
+                File::D if to_sq_file != File::C && to_sq_file != File::E => return false,
+                File::E if to_sq_file != File::D && to_sq_file != File::F => return false,
+                File::F if to_sq_file != File::E && to_sq_file != File::G => return false,
+                File::G if to_sq_file != File::F && to_sq_file != File::H => return false,
+                File::H if to_sq_file != File::G => return false,
+                _ => (),
+            }
         }
         // Incompatible flags
-        if (is_en_passent && is_castle) ||
-            (is_en_passent && is_promotion) ||
-            (is_castle && is_promotion) {
+        if (is_en_passent && is_castle) || (is_en_passent && is_promotion) ||
+           (is_castle && is_promotion) {
             return false;
         }
         // No promotion flag with promoting piece
-        if !is_en_passent && (self.0 & (0b11 << 12)) != 0 {
+        if !is_promotion && (self.0 & (0b11 << 12)) != 0 {
             return false;
         }
         // Same from and to squares
@@ -276,45 +295,76 @@ impl Move {
     }
 
     pub fn from_sq(&self) -> Square {
-        Square((self.0 & 63) as u8)
+        Square((self.0 & 0b111111) as u8)
     }
 
     pub fn to_sq(&self) -> Square {
-        Square(((self.0 >> 6) & 63) as u8)
+        Square(((self.0 >> 6) & 0b111111) as u8)
     }
 
     pub fn is_promotion(&self) -> bool {
-        (self.0 & PROMOTION_FLAG) != 0
+        (self.0 & (0b11 << 14)) == PROMOTION_FLAG
     }
 
     pub fn is_en_passent(&self) -> bool {
-        (self.0 & EN_PASSENT_FLAG) != 0
+        (self.0 & (0b11 << 14)) == EN_PASSENT_FLAG
     }
 
     pub fn is_castle(&self) -> bool {
-        (self.0 & CASTLING_FLAG) != 0
+        (self.0 & (0b11 << 14)) == CASTLING_FLAG
     }
 
     pub fn castle_side(&self) -> CastleSide {
-        // se flag for nula, retorna CastleSide::None, senão retorna pela coluna que foi.
-        let mut ret = CastleSide::None;
-        if self.is_castle() == true {
-            if self.to_sq().file() == File::C {
-                ret = CastleSide::Queenside;
-            } else {
-                ret = CastleSide::Kingside;
-            }
+        if !self.is_castle() {
+            return CastleSide::None;
         }
-        ret
+        match self.to_sq().file() {
+            File::C => CastleSide::Queenside,
+            File::G => CastleSide::Kingside,
+            file @ _ => panic!(format!("Illegal file in castle move: {}", file)),
+        }
     }
 
     pub fn promoted_piece(&self) -> Piece {
-        // se flag de promoção for false, retorna Piece::None, senão retorna pelo match
-        // cuidado pois o cavalo tem entrada 0, que é igual a quando não é promoção
-        unimplemented!();
+        if !self.is_promotion() {
+            return Piece::None;
+        }
+        match (self.0 >> 12) & 0b11 {
+            0b00 => Piece::Knight,
+            0b01 => Piece::Bishop,
+            0b10 => Piece::Rook,
+            0b11 => Piece::Queen,
+            promotion @ _ => {
+                panic!(format!("Wrong promotion value after shift and bitwise-and: {}",
+                               promotion))
+            }
+        }
     }
 }
 
+impl fmt::Display for Move {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.is_castle() {
+            write!(f, "{}", self.castle_side())
+        } else if self.is_promotion() {
+            write!(f,
+                   "{}-{}={}",
+                   self.from_sq().to_string(),
+                   self.to_sq().to_string(),
+                   self.promoted_piece().to_string())
+        } else if self.is_en_passent() {
+            write!(f,
+                   "{}-{} e.p.",
+                   self.from_sq().to_string(),
+                   self.to_sq().to_string())
+        } else {
+            write!(f,
+                   "{}-{}",
+                   self.from_sq().to_string(),
+                   self.to_sq().to_string())
+        }
+    }
+}
 
 
 /// Queue of four killer moves. The first entry is the newest.
@@ -416,116 +466,593 @@ mod tests {
 
     #[test]
     fn move_creation() {
-        // lance vazio
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::None, CastleSide::None, false), NULL_MOVE);
-        // lance normal
-        assert_eq!(Move::new(Square(1u8), Square(2u8), Piece::None, CastleSide::None, false), Move(1u16 | (2u16 << 6)));
-        assert_eq!(Move::new(Square(6u8), Square(9u8), Piece::None, CastleSide::None, false), Move(6u16 | (9u16 << 6)));
-        assert_eq!(Move::new(Square(63u8), Square(63u8), Piece::None, CastleSide::None, false), Move(63u16 | (63u16 << 6)));
-        // en passent com as 2 cores
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::None, CastleSide::None, true).0, EN_PASSENT_FLAG);
-        // roque pros 2 lados com as 2 cores
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::None, CastleSide::Kingside, false),
-                   Move::new(Square(0u8), Square(0u8), Piece::None, CastleSide::Queenside, false));
-        // promoção pra todos os tipos de peça
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Knight, CastleSide::None, false), Move(PROMOTION_FLAG));
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Bishop, CastleSide::None, false), Move(PROMOTION_FLAG | (1 << 12)));
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Rook, CastleSide::None, false), Move(PROMOTION_FLAG | (2 << 12)));
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::Queen, CastleSide::None, false), Move(PROMOTION_FLAG | (3 << 12)));
-        // promoção com captura
-        // lance com cada um dos squares com valor grande demais (> 63) -> panic
-        assert!(panic::catch_unwind(|| { Move::new(Square(64u8), Square(0u8), Piece::None, CastleSide::None, false) }).is_err());
-        assert!(panic::catch_unwind(|| { Move::new(Square(0u8), Square(64u8), Piece::None, CastleSide::None, false) }).is_err());
-        assert!(panic::catch_unwind(|| { Move::new(Square(255u8), Square(255u8), Piece::None, CastleSide::None, false) }).is_err());
+        // Null move
+        assert_eq!(Move::new(Square(0u8),
+                             Square(0u8),
+                             Piece::None,
+                             CastleSide::None,
+                             false),
+                   NULL_MOVE);
+        // Regular moves
+        // Same rank, includes a1
+        assert_eq!(Move::new(Square::from_file_rank(File::A, Rank::_1),
+                             Square::from_file_rank(File::B, Rank::_1),
+                             Piece::None,
+                             CastleSide::None,
+                             false),
+                   Move(0u16 | (1u16 << 6)));
+        // Same file, includes h8
+        assert_eq!(Move::new(Square::from_file_rank(File::H, Rank::_8),
+                             Square::from_file_rank(File::H, Rank::_6),
+                             Piece::None,
+                             CastleSide::None,
+                             false),
+                   Move((7u16 + 56u16) | ((7u16 + 40u16) << 6)));
+        // Different files and ranks
+        assert_eq!(Move::new(Square::from_file_rank(File::G, Rank::_1),
+                             Square::from_file_rank(File::F, Rank::_3),
+                             Piece::None,
+                             CastleSide::None,
+                             false),
+                   Move(6u16 | ((5u16 + 16u16) << 6)));
+        // En passent
+        // En passent with white
+        assert_eq!(Move::new(Square::from_file_rank(File::E, Rank::_5),
+                             Square::from_file_rank(File::D, Rank::_6),
+                             Piece::None,
+                             CastleSide::None,
+                             true),
+                   Move((4u16 + 32u16) | ((3u16 + 40u16) << 6) | EN_PASSENT_FLAG));
+        // En passent with black
+        assert_eq!(Move::new(Square::from_file_rank(File::E, Rank::_4),
+                             Square::from_file_rank(File::D, Rank::_3),
+                             Piece::None,
+                             CastleSide::None,
+                             true),
+                   Move((4u16 + 24u16) | ((3u16 + 16u16) << 6) | EN_PASSENT_FLAG));
+        // Castling
+        // Castling Kingside white
+        assert_eq!(Move::new(Square::from_file_rank(File::E, Rank::_1),
+                             Square::from_file_rank(File::G, Rank::_1),
+                             Piece::None,
+                             CastleSide::Kingside,
+                             false),
+                   Move(4u16 | (6u16 << 6) | CASTLING_FLAG));
+        // Castling Queenside white
+        assert_eq!(Move::new(Square::from_file_rank(File::E, Rank::_1),
+                             Square::from_file_rank(File::C, Rank::_1),
+                             Piece::None,
+                             CastleSide::Queenside,
+                             false),
+                   Move(4u16 | (2u16 << 6) | CASTLING_FLAG));
+        // Castling Kingside black
+        assert_eq!(Move::new(Square::from_file_rank(File::E, Rank::_8),
+                             Square::from_file_rank(File::G, Rank::_8),
+                             Piece::None,
+                             CastleSide::Kingside,
+                             false),
+                   Move((4u16 + 56u16) | ((6u16 + 56u16) << 6) | CASTLING_FLAG));
+        // Castling Queenside black
+        assert_eq!(Move::new(Square::from_file_rank(File::E, Rank::_8),
+                             Square::from_file_rank(File::C, Rank::_8),
+                             Piece::None,
+                             CastleSide::Queenside,
+                             false),
+                   Move((4u16 + 56u16) | ((2u16 + 56u16) << 6) | CASTLING_FLAG));
+        // Promotion
+        // To white Knight
+        assert_eq!(Move::new(Square::from_file_rank(File::A, Rank::_7),
+                             Square::from_file_rank(File::A, Rank::_8),
+                             Piece::Knight,
+                             CastleSide::None,
+                             false),
+                   Move((0u16 + 48u16) | ((0u16 + 56u16) << 6) | PROMOTION_FLAG));
+        // To black Bishop
+        assert_eq!(Move::new(Square::from_file_rank(File::B, Rank::_2),
+                             Square::from_file_rank(File::B, Rank::_1),
+                             Piece::Bishop,
+                             CastleSide::None,
+                             false),
+                   Move((1u16 + 8u16) | ((1u16 + 0u16) << 6) | (0b01 << 12) | PROMOTION_FLAG));
+        // To Rook, with capture by white
+        assert_eq!(Move::new(Square::from_file_rank(File::A, Rank::_7),
+                             Square::from_file_rank(File::B, Rank::_8),
+                             Piece::Rook,
+                             CastleSide::None,
+                             false),
+                   Move((0u16 + 48u16) | ((1u16 + 56u16) << 6) | (0b10 << 12) | PROMOTION_FLAG));
+        // To Queen, with capture by black
+        assert_eq!(Move::new(Square::from_file_rank(File::B, Rank::_2),
+                             Square::from_file_rank(File::C, Rank::_1),
+                             Piece::Queen,
+                             CastleSide::None,
+                             false),
+                   Move((1u16 + 8u16) | ((2u16 + 0u16) << 6) | (0b11 << 12) | PROMOTION_FLAG));
+        // Move's with any square having a value too big (> 63) should panic
+        assert!(panic::catch_unwind(|| {
+                Move::new(Square(64u8),
+                          Square(0u8),
+                          Piece::None,
+                          CastleSide::None,
+                          false)
+            })
+            .is_err());
+        assert!(panic::catch_unwind(|| {
+                Move::new(Square(0u8),
+                          Square(64u8),
+                          Piece::None,
+                          CastleSide::None,
+                          false)
+            })
+            .is_err());
+        assert!(panic::catch_unwind(|| {
+                Move::new(Square(255u8),
+                          Square(255u8),
+                          Piece::None,
+                          CastleSide::None,
+                          false)
+            })
+            .is_err());
     }
 
     #[test]
     fn move_is_valid() {
-        // cada um dos lances acima deveria passar, exceto vazio e square errado (panic)
-        // lance com de e para iguais (não nulos)
-        assert!(Move::new(Square(3u8), Square(3u8), Piece::None, CastleSide::None, false).is_valid_move() == false)
-        // roque de e para a casa (rank & file) errada, pros 2 lados com as 2 cores
-        // en passent de e para a casa(rank & file) errada, pros 2 lados com as 2 cores
-        // promoção de e para a casa (rank) errada
-        // mistura de flags impossíveis (en passent + castle,
-        // en passent + promotion, castle + promotion, todos)
-        // não promoção com peça de promoção não nula
+        // Moves with same from and to squares should NOT be valid
+        assert!(!NULL_MOVE.is_valid());
+        assert!(!Move::new(Square::from_file_rank(File::D, Rank::_1),
+                           Square::from_file_rank(File::D, Rank::_1),
+                           Piece::None,
+                           CastleSide::None,
+                           false)
+            .is_valid());
+        // Regular moves
+        // Same rank, includes a1
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_1),
+                          Square::from_file_rank(File::B, Rank::_1),
+                          Piece::None,
+                          CastleSide::None,
+                          false)
+            .is_valid());
+        // Same file, includes h8
+        assert!(Move::new(Square::from_file_rank(File::H, Rank::_8),
+                          Square::from_file_rank(File::H, Rank::_6),
+                          Piece::None,
+                          CastleSide::None,
+                          false)
+            .is_valid());
+        // Different files and ranks
+        assert!(Move::new(Square::from_file_rank(File::G, Rank::_1),
+                          Square::from_file_rank(File::F, Rank::_3),
+                          Piece::None,
+                          CastleSide::None,
+                          false)
+            .is_valid());
+        // En passent
+        // En passent with white
+        assert!(Move::new(Square::from_file_rank(File::E, Rank::_5),
+                          Square::from_file_rank(File::D, Rank::_6),
+                          Piece::None,
+                          CastleSide::None,
+                          true)
+            .is_valid());
+        // En passent with white, wrong rank (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_6),
+                           Square::from_file_rank(File::D, Rank::_7),
+                           Piece::None,
+                           CastleSide::None,
+                           true)
+            .is_valid());
+        // En passent with white, wrong file (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_5),
+                           Square::from_file_rank(File::E, Rank::_6),
+                           Piece::None,
+                           CastleSide::None,
+                           true)
+            .is_valid());
+        // En passent with black
+        assert!(Move::new(Square::from_file_rank(File::E, Rank::_4),
+                          Square::from_file_rank(File::D, Rank::_3),
+                          Piece::None,
+                          CastleSide::None,
+                          true)
+            .is_valid());
+        // En passent with black, wrong rank (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_5),
+                           Square::from_file_rank(File::D, Rank::_4),
+                           Piece::None,
+                           CastleSide::None,
+                           true)
+            .is_valid());
+        // En passent with black, wrong file (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_4),
+                           Square::from_file_rank(File::B, Rank::_3),
+                           Piece::None,
+                           CastleSide::None,
+                           true)
+            .is_valid());
+        // Castling
+        // Castling Kingside white
+        assert!(Move::new(Square::from_file_rank(File::E, Rank::_1),
+                          Square::from_file_rank(File::G, Rank::_1),
+                          Piece::None,
+                          CastleSide::Kingside,
+                          false)
+            .is_valid());
+        // Castling Kingside white wrong rank (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_1),
+                           Square::from_file_rank(File::G, Rank::_2),
+                           Piece::None,
+                           CastleSide::Kingside,
+                           false)
+            .is_valid());
+        // Castling Kingside white wrong file (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_1),
+                           Square::from_file_rank(File::F, Rank::_1),
+                           Piece::None,
+                           CastleSide::Kingside,
+                           false)
+            .is_valid());
+        // Castling Queenside white
+        assert!(Move::new(Square::from_file_rank(File::E, Rank::_1),
+                          Square::from_file_rank(File::C, Rank::_1),
+                          Piece::None,
+                          CastleSide::Queenside,
+                          false)
+            .is_valid());
+        // Castling Queenside white wrong file (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_1),
+                           Square::from_file_rank(File::B, Rank::_1),
+                           Piece::None,
+                           CastleSide::Queenside,
+                           false)
+            .is_valid());
+        // Castling Queenside white wrong rank (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_2),
+                           Square::from_file_rank(File::C, Rank::_1),
+                           Piece::None,
+                           CastleSide::Queenside,
+                           false)
+            .is_valid());
+        // Castling Kingside black
+        assert!(Move::new(Square::from_file_rank(File::E, Rank::_8),
+                          Square::from_file_rank(File::G, Rank::_8),
+                          Piece::None,
+                          CastleSide::Kingside,
+                          false)
+            .is_valid());
+        // Castling Kingside black wrong rank (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_8),
+                           Square::from_file_rank(File::G, Rank::_7),
+                           Piece::None,
+                           CastleSide::Kingside,
+                           false)
+            .is_valid());
+        // Castling Kingside black wrong file (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_8),
+                           Square::from_file_rank(File::F, Rank::_8),
+                           Piece::None,
+                           CastleSide::Kingside,
+                           false)
+            .is_valid());
+        // Castling Queenside black
+        assert!(Move::new(Square::from_file_rank(File::E, Rank::_8),
+                          Square::from_file_rank(File::C, Rank::_8),
+                          Piece::None,
+                          CastleSide::Queenside,
+                          false)
+            .is_valid());
+        // Castling Queenside black wrong file (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_8),
+                           Square::from_file_rank(File::B, Rank::_8),
+                           Piece::None,
+                           CastleSide::Queenside,
+                           false)
+            .is_valid());
+        // Castling Queenside black wrong rank (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_7),
+                           Square::from_file_rank(File::C, Rank::_8),
+                           Piece::None,
+                           CastleSide::Queenside,
+                           false)
+            .is_valid());
+        // Promotion
+        // To white Knight
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_7),
+                          Square::from_file_rank(File::A, Rank::_8),
+                          Piece::Knight,
+                          CastleSide::None,
+                          false)
+            .is_valid());
+        // To black Bishop
+        assert!(Move::new(Square::from_file_rank(File::B, Rank::_2),
+                          Square::from_file_rank(File::B, Rank::_1),
+                          Piece::Bishop,
+                          CastleSide::None,
+                          false)
+            .is_valid());
+        // To Rook, with capture by white
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_7),
+                          Square::from_file_rank(File::B, Rank::_8),
+                          Piece::Rook,
+                          CastleSide::None,
+                          false)
+            .is_valid());
+        // To Queen, with capture by black
+        assert!(Move::new(Square::from_file_rank(File::B, Rank::_2),
+                          Square::from_file_rank(File::C, Rank::_1),
+                          Piece::Queen,
+                          CastleSide::None,
+                          false)
+            .is_valid());
+        // To wrong rank, white (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::B, Rank::_7),
+                           Square::from_file_rank(File::C, Rank::_6),
+                           Piece::Queen,
+                           CastleSide::None,
+                           false)
+            .is_valid());
+        // To wrong rank, black (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::B, Rank::_2),
+                           Square::from_file_rank(File::C, Rank::_2),
+                           Piece::Queen,
+                           CastleSide::None,
+                           false)
+            .is_valid());
+        // Mixture of self excluding flags
+        // en passent + castle (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::B, Rank::_2),
+                           Square::from_file_rank(File::C, Rank::_2),
+                           Piece::None,
+                           CastleSide::Kingside,
+                           true)
+            .is_valid());
+        // en passent + promotion (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::C, Rank::_7),
+                           Square::from_file_rank(File::C, Rank::_8),
+                           Piece::Knight,
+                           CastleSide::None,
+                           true)
+            .is_valid());
+        // castle + promotion (should NOT be legal)
+        assert!(!Move::new(Square::from_file_rank(File::F, Rank::_7),
+                           Square::from_file_rank(File::G, Rank::_8),
+                           Piece::Knight,
+                           CastleSide::Kingside,
+                           true)
+            .is_valid());
     }
 
     #[test]
     fn move_from_sq() {
-        assert_eq!(Move::new(Square(0u8), Square(0), Piece::None, CastleSide::None, false).from_sq(), Square(0u8));
-        assert_eq!(Move::new(Square(9u8), Square(0), Piece::None, CastleSide::None, false).from_sq(), Square(9u8));
-        assert_eq!(Move::new(Square(18u8), Square(0), Piece::None, CastleSide::None, false).from_sq(), Square(18u8));
-        assert_eq!(Move::new(Square(27u8), Square(0), Piece::None, CastleSide::None, false).from_sq(), Square(27u8));
-        assert_eq!(Move::new(Square(36u8), Square(0), Piece::None, CastleSide::None, false).from_sq(), Square(36u8));
-        assert_eq!(Move::new(Square(45u8), Square(0), Piece::None, CastleSide::None, false).from_sq(), Square(45u8));
-        assert_eq!(Move::new(Square(54u8), Square(0), Piece::None, CastleSide::None, false).from_sq(), Square(54u8));
-        assert_eq!(Move::new(Square(63u8), Square(0), Piece::None, CastleSide::None, false).from_sq(), Square(63u8));
+        assert_eq!(Move::new(Square::from_file_rank(File::A, Rank::_1),
+                             Square::from_file_rank(File::A, Rank::_2),
+                             Piece::None,
+                             CastleSide::None,
+                             false)
+                       .from_sq(),
+                   Square::from_file_rank(File::A, Rank::_1));
+        assert_eq!(Move::new(Square::from_file_rank(File::B, Rank::_2),
+                             Square::from_file_rank(File::B, Rank::_3),
+                             Piece::None,
+                             CastleSide::None,
+                             false)
+                       .from_sq(),
+                   Square::from_file_rank(File::B, Rank::_2));
+        assert_eq!(Move::new(Square::from_file_rank(File::H, Rank::_8),
+                             Square::from_file_rank(File::G, Rank::_6),
+                             Piece::None,
+                             CastleSide::None,
+                             false)
+                       .from_sq(),
+                   Square::from_file_rank(File::H, Rank::_8));
     }
 
     #[test]
     fn move_to_sq() {
-        assert_eq!(Move::new(Square(0), Square(0u8), Piece::None, CastleSide::None, false).to_sq(), Square(0u8));
-        assert_eq!(Move::new(Square(0), Square(9u8), Piece::None, CastleSide::None, false).to_sq(), Square(9u8));
-        assert_eq!(Move::new(Square(0), Square(18u8), Piece::None, CastleSide::None, false).to_sq(), Square(18u8));
-        assert_eq!(Move::new(Square(0), Square(27u8), Piece::None, CastleSide::None, false).to_sq(), Square(27u8));
-        assert_eq!(Move::new(Square(0), Square(36u8), Piece::None, CastleSide::None, false).to_sq(), Square(36u8));
-        assert_eq!(Move::new(Square(0), Square(45u8), Piece::None, CastleSide::None, false).to_sq(), Square(45u8));
-        assert_eq!(Move::new(Square(0), Square(54u8), Piece::None, CastleSide::None, false).to_sq(), Square(54u8));
-        assert_eq!(Move::new(Square(0), Square(63u8), Piece::None, CastleSide::None, false).to_sq(), Square(63u8));
+        assert_eq!(Move::new(Square::from_file_rank(File::A, Rank::_2),
+                             Square::from_file_rank(File::A, Rank::_1),
+                             Piece::None,
+                             CastleSide::None,
+                             false)
+                       .to_sq(),
+                   Square::from_file_rank(File::A, Rank::_1));
+        assert_eq!(Move::new(Square::from_file_rank(File::B, Rank::_3),
+                             Square::from_file_rank(File::B, Rank::_2),
+                             Piece::None,
+                             CastleSide::None,
+                             false)
+                       .to_sq(),
+                   Square::from_file_rank(File::B, Rank::_2));
+        assert_eq!(Move::new(Square::from_file_rank(File::G, Rank::_6),
+                             Square::from_file_rank(File::H, Rank::_8),
+                             Piece::None,
+                             CastleSide::None,
+                             false)
+                       .to_sq(),
+                   Square::from_file_rank(File::H, Rank::_8));
     }
 
     #[test]
     fn move_is_promotion() {
-        assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::None, false).is_promotion() == false);
-        assert!(Move::new(Square(0), Square(0), Piece::Knight, CastleSide::None, false).is_promotion() == true);
-        assert!(Move::new(Square(0), Square(0), Piece::Bishop, CastleSide::None, false).is_promotion() == true);
-        assert!(Move::new(Square(0), Square(0), Piece::Rook, CastleSide::None, false).is_promotion() == true);
-        assert!(Move::new(Square(0), Square(0), Piece::Queen, CastleSide::None, false).is_promotion() == true);
-        // Testing using en passent (to test for side effects).
-        assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::None, true).is_promotion() == false);
-        assert!(Move::new(Square(0), Square(0), Piece::Knight, CastleSide::None, true).is_promotion() == true);
-        assert!(Move::new(Square(0), Square(0), Piece::Bishop, CastleSide::None, true).is_promotion() == true);
-        assert!(Move::new(Square(0), Square(0), Piece::Rook, CastleSide::None, true).is_promotion() == true);
-        assert!(Move::new(Square(0), Square(0), Piece::Queen, CastleSide::None, true).is_promotion() == true);
+        // Move to 8th rank but NOT promotion
+        assert!(!Move::new(Square::from_file_rank(File::A, Rank::_7),
+                           Square::from_file_rank(File::A, Rank::_8),
+                           Piece::None,
+                           CastleSide::None,
+                           false)
+            .is_promotion());
+        // Move to 1st rank but NOT promotion
+        assert!(!Move::new(Square::from_file_rank(File::A, Rank::_2),
+                           Square::from_file_rank(File::A, Rank::_1),
+                           Piece::None,
+                           CastleSide::None,
+                           false)
+            .is_promotion());
+        // White promotion with all possible pieces
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_7),
+                          Square::from_file_rank(File::A, Rank::_8),
+                          Piece::Knight,
+                          CastleSide::None,
+                          false)
+            .is_promotion());
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_7),
+                          Square::from_file_rank(File::A, Rank::_8),
+                          Piece::Bishop,
+                          CastleSide::None,
+                          false)
+            .is_promotion());
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_7),
+                          Square::from_file_rank(File::A, Rank::_8),
+                          Piece::Rook,
+                          CastleSide::None,
+                          false)
+            .is_promotion());
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_7),
+                          Square::from_file_rank(File::A, Rank::_8),
+                          Piece::Queen,
+                          CastleSide::None,
+                          false)
+            .is_promotion());
+        // Black promotion with all possible pieces
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_2),
+                          Square::from_file_rank(File::A, Rank::_1),
+                          Piece::Knight,
+                          CastleSide::None,
+                          false)
+            .is_promotion());
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_2),
+                          Square::from_file_rank(File::A, Rank::_1),
+                          Piece::Bishop,
+                          CastleSide::None,
+                          false)
+            .is_promotion());
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_2),
+                          Square::from_file_rank(File::A, Rank::_1),
+                          Piece::Rook,
+                          CastleSide::None,
+                          false)
+            .is_promotion());
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_2),
+                          Square::from_file_rank(File::A, Rank::_1),
+                          Piece::Queen,
+                          CastleSide::None,
+                          false)
+            .is_promotion());
     }
 
     #[test]
     fn move_is_en_passent() {
-        // Basic testing using null moves.
-        assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::None, false).is_en_passent() == false);
-        assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::None, true).is_en_passent() == true);
-        // Tests using promotion (to test for side effects).
-        assert!(Move::new(Square(0), Square(0), Piece::Knight, CastleSide::None, false).is_en_passent() == false);
-        assert!(Move::new(Square(0), Square(0), Piece::Bishop, CastleSide::None, false).is_en_passent() == false);
-        assert!(Move::new(Square(0), Square(0), Piece::Rook, CastleSide::None, false).is_en_passent() == false);
-        assert!(Move::new(Square(0), Square(0), Piece::Queen, CastleSide::None, false).is_en_passent() == false);
-        assert!(Move::new(Square(0), Square(0), Piece::Knight, CastleSide::None, true).is_en_passent() == true);
-        assert!(Move::new(Square(0), Square(0), Piece::Bishop, CastleSide::None, true).is_en_passent() == true);
-        assert!(Move::new(Square(0), Square(0), Piece::Rook, CastleSide::None, true).is_en_passent() == true);
-        assert!(Move::new(Square(0), Square(0), Piece::Queen, CastleSide::None, true).is_en_passent() == true);
-        // Tests using castling (to test for side effects).
-        // These tests all fail because the CASTLING_FLAG also sets the EN_PASSENT_FLAG.
-        // assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::Kingside, false).is_en_passent() == false);
-        // assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::Queenside, false).is_en_passent() == false);
-        // assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::Kingside, true).is_en_passent() == true);
-        // assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::Queenside, true).is_en_passent() == true);
+        // Right squares, NOT en passent
+        assert!(!Move::new(Square::from_file_rank(File::A, Rank::_5),
+                           Square::from_file_rank(File::B, Rank::_6),
+                           Piece::None,
+                           CastleSide::None,
+                           false)
+            .is_en_passent());
+        assert!(!Move::new(Square::from_file_rank(File::A, Rank::_4),
+                           Square::from_file_rank(File::B, Rank::_3),
+                           Piece::None,
+                           CastleSide::None,
+                           false)
+            .is_en_passent());
+        // Right squares, is en passent
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_5),
+                          Square::from_file_rank(File::B, Rank::_6),
+                          Piece::None,
+                          CastleSide::None,
+                          true)
+            .is_en_passent());
+        assert!(Move::new(Square::from_file_rank(File::A, Rank::_4),
+                          Square::from_file_rank(File::B, Rank::_3),
+                          Piece::None,
+                          CastleSide::None,
+                          true)
+            .is_en_passent());
+        // Tests using promotion and castling (to test for side effects).
+        assert!(!Move::new(Square::from_file_rank(File::A, Rank::_4),
+                           Square::from_file_rank(File::A, Rank::_3),
+                           Piece::Knight,
+                           CastleSide::None,
+                           false)
+            .is_en_passent());
+        assert!(!Move::new(Square::from_file_rank(File::A, Rank::_4),
+                           Square::from_file_rank(File::A, Rank::_3),
+                           Piece::Bishop,
+                           CastleSide::None,
+                           false)
+            .is_en_passent());
+        assert!(!Move::new(Square::from_file_rank(File::A, Rank::_4),
+                           Square::from_file_rank(File::A, Rank::_3),
+                           Piece::Rook,
+                           CastleSide::None,
+                           false)
+            .is_en_passent());
+        assert!(!Move::new(Square::from_file_rank(File::A, Rank::_4),
+                           Square::from_file_rank(File::A, Rank::_3),
+                           Piece::Queen,
+                           CastleSide::None,
+                           false)
+            .is_en_passent());
+        assert!(!Move::new(Square::from_file_rank(File::A, Rank::_4),
+                           Square::from_file_rank(File::A, Rank::_3),
+                           Piece::None,
+                           CastleSide::Kingside,
+                           false)
+            .is_en_passent());
+        assert!(!Move::new(Square::from_file_rank(File::A, Rank::_4),
+                           Square::from_file_rank(File::A, Rank::_3),
+                           Piece::None,
+                           CastleSide::Queenside,
+                           false)
+            .is_en_passent());
     }
 
     #[test]
     fn move_is_castle() {
         // Basic testing using null moves.
-        assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::None, false).is_castle() == false);
-        assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::Kingside, false).is_castle() == true);
-        assert!(Move::new(Square(0), Square(0), Piece::None, CastleSide::Queenside, false).is_castle() == true);
+        assert!(!Move::new(Square::from_file_rank(File::E, Rank::_1),
+                           Square::from_file_rank(File::G, Rank::_1),
+                           Piece::None,
+                           CastleSide::None,
+                           false)
+            .is_castle());
+        assert!(Move::new(Square::from_file_rank(File::E, Rank::_1),
+                          Square::from_file_rank(File::G, Rank::_1),
+                          Piece::None,
+                          CastleSide::Kingside,
+                          false)
+            .is_castle());
+        assert!(Move::new(Square::from_file_rank(File::E, Rank::_1),
+                          Square::from_file_rank(File::C, Rank::_1),
+                          Piece::None,
+                          CastleSide::Queenside,
+                          false)
+            .is_castle());
     }
 
     #[test]
     fn move_castle_side() {
-        assert_eq!(Move::new(Square(0u8), Square(0u8), Piece::None, CastleSide::None, false).castle_side(), CastleSide::None);
-        assert_eq!(Move::new(Square(0u8), Square(2u8), Piece::None, CastleSide::Queenside, false).castle_side(), CastleSide::Queenside);
-        assert_eq!(Move::new(Square(0u8), Square(6u8), Piece::None, CastleSide::Kingside, false).castle_side(), CastleSide::Kingside);
+        assert_eq!(Move::new(Square::from_file_rank(File::E, Rank::_1),
+                             Square::from_file_rank(File::G, Rank::_1),
+                             Piece::None,
+                             CastleSide::None,
+                             false)
+                       .castle_side(),
+                   CastleSide::None);
+        assert_eq!(Move::new(Square::from_file_rank(File::E, Rank::_1),
+                             Square::from_file_rank(File::G, Rank::_1),
+                             Piece::None,
+                             CastleSide::Kingside,
+                             false)
+                       .castle_side(),
+                   CastleSide::Kingside);
+        assert_eq!(Move::new(Square::from_file_rank(File::E, Rank::_1),
+                             Square::from_file_rank(File::C, Rank::_1),
+                             Piece::None,
+                             CastleSide::Queenside,
+                             false)
+                       .castle_side(),
+                   CastleSide::Queenside);
     }
 
     #[test]
@@ -565,9 +1092,74 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn move_display() {
-        unimplemented!();
+        // Regular move
+        assert_eq!(format!("{}",
+                           Move::new(Square::from_file_rank(File::B, Rank::_1),
+                                     Square::from_file_rank(File::C, Rank::_3),
+                                     Piece::None,
+                                     CastleSide::None,
+                                     false)),
+                   "b1-c3");
+        // Promotions
+        // Knight
+        assert_eq!(format!("{}",
+                           Move::new(Square::from_file_rank(File::B, Rank::_7),
+                                     Square::from_file_rank(File::B, Rank::_8),
+                                     Piece::Knight,
+                                     CastleSide::None,
+                                     false)),
+                   "b7-b8=♘");
+        // Bishop
+        assert_eq!(format!("{}",
+                           Move::new(Square::from_file_rank(File::B, Rank::_7),
+                                     Square::from_file_rank(File::B, Rank::_8),
+                                     Piece::Bishop,
+                                     CastleSide::None,
+                                     false)),
+                   "b7-b8=♗");
+        // Rook
+        assert_eq!(format!("{}",
+                           Move::new(Square::from_file_rank(File::B, Rank::_7),
+                                     Square::from_file_rank(File::B, Rank::_8),
+                                     Piece::Rook,
+                                     CastleSide::None,
+                                     false)),
+                   "b7-b8=♖");
+        // Queen
+        assert_eq!(format!("{}",
+                           Move::new(Square::from_file_rank(File::B, Rank::_7),
+                                     Square::from_file_rank(File::B, Rank::_8),
+                                     Piece::Queen,
+                                     CastleSide::None,
+                                     false)),
+                   "b7-b8=♕");
+        // Castling
+        // Kingside
+        assert_eq!(format!("{}",
+                           Move::new(Square::from_file_rank(File::E, Rank::_1),
+                                     Square::from_file_rank(File::G, Rank::_1),
+                                     Piece::None,
+                                     CastleSide::Kingside,
+                                     false)),
+                   "O-O");
+        // Queenside
+        assert_eq!(format!("{}",
+                           Move::new(Square::from_file_rank(File::E, Rank::_8),
+                                     Square::from_file_rank(File::C, Rank::_8),
+                                     Piece::None,
+                                     CastleSide::Queenside,
+                                     false)),
+                   "O-O-O");
+        // En passent
+        assert_eq!(format!("{}",
+                           Move::new(Square::from_file_rank(File::E, Rank::_5),
+                                     Square::from_file_rank(File::D, Rank::_6),
+                                     Piece::None,
+                                     CastleSide::None,
+                                     true)),
+                   "e5-d6 e.p.");
+
     }
 
     #[test]

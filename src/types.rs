@@ -4,7 +4,7 @@
 //! * Square
 //! * Move
 //! * Killer Moves
-//! * GameInfo
+//! * Game Info
 //!
 //! And maybe some (global) consts (castling, color, pieces, etc).
 
@@ -127,15 +127,15 @@ impl Square {
     /// (may be lower or uppercase) and one number between '1' and '8'.
     pub fn from_string(input: String) -> Result<Square, String> {
         let input_char_vec: Vec<char> = input.chars()
-            .filter(|ref c| c.is_ascii())
+            .filter(|c| c.is_ascii())
             .collect();
         if input_char_vec.len() != 2 {
             return Err(format!("String \"{}\" is not a legal square name.", input));
         }
         let mut ret_u8 = 0u8;
         match input_char_vec[0] {
-            c @ 'a'...'h' => ret_u8 += c as u8 - 'a' as u8,
-            c @ 'A'...'H' => ret_u8 += c as u8 - 'A' as u8,
+            c @ 'a'...'h' => ret_u8 += c as u8 - b'a',
+            c @ 'A'...'H' => ret_u8 += c as u8 - b'A',
             _ => return Err(format!("String \"{}\" is not a legal square name.", input)),
         }
         match input_char_vec[1] {
@@ -186,7 +186,7 @@ impl fmt::Display for Square {
 /// bits 12-13: promotion piece type (Knight = 0, Bishop = 1, Rook = 2, Queen = 3)
 /// bits 14-15: special move flags (promotion = 1, en passent = 2, castling = 3)
 ///
-/// Note that, if we need to create a NULL_MOVE, we can use 0 (since there is no
+/// Note that, if we need to create a `NULL_MOVE`, we can use 0 (since there is no
 /// legal move where the origin and destination squares are the same).
 ///
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -199,22 +199,22 @@ pub const EN_PASSENT_FLAG: u16 = 0b10 << 14;
 pub const CASTLING_FLAG: u16 = 0b11 << 14;
 
 impl Move {
-    pub fn new(from_sq: Square,
-               to_sq: Square,
+    pub fn new(sq_from: Square,
+               sq_to: Square,
                promoted_piece: Piece,
                castle_side: CastleSide,
                is_en_passent: bool)
                -> Move {
-        assert!(from_sq.0 < 64);
-        assert!(to_sq.0 < 64);
-        let mut ret = Move(from_sq.0 as u16 | ((to_sq.0 as u16) << 6));
+        assert!(sq_from.0 < 64);
+        assert!(sq_to.0 < 64);
+        let mut ret = Move(sq_from.0 as u16 | ((sq_to.0 as u16) << 6));
         match promoted_piece {
             Piece::None => (),
             Piece::Knight => ret.0 |= PROMOTION_FLAG,
             Piece::Bishop => ret.0 |= (1 << 12) | PROMOTION_FLAG,
             Piece::Rook => ret.0 |= (2 << 12) | PROMOTION_FLAG,
             Piece::Queen => ret.0 |= (3 << 12) | PROMOTION_FLAG,
-            piece @ _ => panic!(format!("Invalid promoted piece: {}", piece)),
+            piece => panic!(format!("Invalid promoted piece: {}", piece)),
         }
         match castle_side {
             CastleSide::None => (),
@@ -227,12 +227,12 @@ impl Move {
     }
 
     pub fn is_valid(&self) -> bool {
-        let from_sq = self.from_sq();
-        let to_sq = self.to_sq();
-        let from_sq_rank = from_sq.rank();
-        let from_sq_file = from_sq.file();
-        let to_sq_rank = to_sq.rank();
-        let to_sq_file = to_sq.file();
+        let sq_from = self.sq_from();
+        let sq_to = self.sq_to();
+        let sq_from_rank = sq_from.rank();
+        let sq_from_file = sq_from.file();
+        let sq_to_rank = sq_to.rank();
+        let sq_to_file = sq_to.file();
         let castle_side: CastleSide;
         match panic::catch_unwind(|| self.castle_side()) {
             Ok(temp_cs) => castle_side = temp_cs,
@@ -243,41 +243,41 @@ impl Move {
         let is_en_passent = self.is_en_passent();
         // Wrong promotion squares
         if is_promotion &&
-           ((from_sq_rank != Rank::_2 && from_sq_rank != Rank::_7) ||
-            (to_sq_rank != Rank::_1 && to_sq_rank != Rank::_8)) {
+           ((sq_from_rank != Rank::_2 && sq_from_rank != Rank::_7) ||
+            (sq_to_rank != Rank::_1 && sq_to_rank != Rank::_8)) {
             return false;
         }
         // Wrong castle squares
         if is_castle {
-            if !((from_sq_rank == Rank::_1 && to_sq_rank == Rank::_1) ||
-                 (from_sq_rank == Rank::_8 && to_sq_rank == Rank::_8)) {
+            if !((sq_from_rank == Rank::_1 && sq_to_rank == Rank::_1) ||
+                 (sq_from_rank == Rank::_8 && sq_to_rank == Rank::_8)) {
                 return false;
             }
-            if from_sq_file != File::E || (to_sq_file != File::C && to_sq_file != File::G) {
+            if sq_from_file != File::E || (sq_to_file != File::C && sq_to_file != File::G) {
                 return false;
             }
         }
         // Wrong castle side
         if is_castle &&
-           ((castle_side == CastleSide::Kingside && to_sq_file != File::G) ||
-            (castle_side == CastleSide::Queenside && to_sq_file != File::C)) {
+           ((castle_side == CastleSide::Kingside && sq_to_file != File::G) ||
+            (castle_side == CastleSide::Queenside && sq_to_file != File::C)) {
             return false;
         }
         // Wrong en passent squares
         if is_en_passent {
-            if !((from_sq_rank == Rank::_4 && to_sq_rank == Rank::_3) ||
-                 (from_sq_rank == Rank::_5 && to_sq_rank == Rank::_6)) {
+            if !((sq_from_rank == Rank::_4 && sq_to_rank == Rank::_3) ||
+                 (sq_from_rank == Rank::_5 && sq_to_rank == Rank::_6)) {
                 return false;
             }
-            match from_sq_file {
-                File::A if to_sq_file != File::B => return false,
-                File::B if to_sq_file != File::A && to_sq_file != File::C => return false,
-                File::C if to_sq_file != File::B && to_sq_file != File::D => return false,
-                File::D if to_sq_file != File::C && to_sq_file != File::E => return false,
-                File::E if to_sq_file != File::D && to_sq_file != File::F => return false,
-                File::F if to_sq_file != File::E && to_sq_file != File::G => return false,
-                File::G if to_sq_file != File::F && to_sq_file != File::H => return false,
-                File::H if to_sq_file != File::G => return false,
+            match sq_from_file {
+                File::A if sq_to_file != File::B => return false,
+                File::B if sq_to_file != File::A && sq_to_file != File::C => return false,
+                File::C if sq_to_file != File::B && sq_to_file != File::D => return false,
+                File::D if sq_to_file != File::C && sq_to_file != File::E => return false,
+                File::E if sq_to_file != File::D && sq_to_file != File::F => return false,
+                File::F if sq_to_file != File::E && sq_to_file != File::G => return false,
+                File::G if sq_to_file != File::F && sq_to_file != File::H => return false,
+                File::H if sq_to_file != File::G => return false,
                 _ => (),
             }
         }
@@ -291,14 +291,14 @@ impl Move {
             return false;
         }
         // Same from and to squares
-        from_sq != to_sq
+        sq_from != sq_to
     }
 
-    pub fn from_sq(&self) -> Square {
+    pub fn sq_from(&self) -> Square {
         Square((self.0 & 0b111111) as u8)
     }
 
-    pub fn to_sq(&self) -> Square {
+    pub fn sq_to(&self) -> Square {
         Square(((self.0 >> 6) & 0b111111) as u8)
     }
 
@@ -318,10 +318,10 @@ impl Move {
         if !self.is_castle() {
             return CastleSide::None;
         }
-        match self.to_sq().file() {
+        match self.sq_to().file() {
             File::C => CastleSide::Queenside,
             File::G => CastleSide::Kingside,
-            file @ _ => panic!(format!("Illegal file in castle move: {}", file)),
+            file => panic!(format!("Illegal file in castle move: {}", file)),
         }
     }
 
@@ -334,9 +334,8 @@ impl Move {
             0b01 => Piece::Bishop,
             0b10 => Piece::Rook,
             0b11 => Piece::Queen,
-            promotion @ _ => {
-                panic!(format!("Wrong promotion value after shift and bitwise-and: {}",
-                               promotion))
+            promotion => {panic!(format!("Wrong promotion value after shift and bitwise-and: {}",
+                                         promotion))
             }
         }
     }
@@ -349,19 +348,19 @@ impl fmt::Display for Move {
         } else if self.is_promotion() {
             write!(f,
                    "{}-{}={}",
-                   self.from_sq().to_string(),
-                   self.to_sq().to_string(),
+                   self.sq_from().to_string(),
+                   self.sq_to().to_string(),
                    self.promoted_piece().to_string())
         } else if self.is_en_passent() {
             write!(f,
                    "{}-{} e.p.",
-                   self.from_sq().to_string(),
-                   self.to_sq().to_string())
+                   self.sq_from().to_string(),
+                   self.sq_to().to_string())
         } else {
             write!(f,
                    "{}-{}",
-                   self.from_sq().to_string(),
-                   self.to_sq().to_string())
+                   self.sq_from().to_string(),
+                   self.sq_to().to_string())
         }
     }
 }
@@ -823,52 +822,52 @@ mod tests {
     }
 
     #[test]
-    fn move_from_sq() {
+    fn move_sq_from() {
         assert_eq!(Move::new(Square::from_file_rank(File::A, Rank::_1),
                              Square::from_file_rank(File::A, Rank::_2),
                              Piece::None,
                              CastleSide::None,
                              false)
-                       .from_sq(),
+                       .sq_from(),
                    Square::from_file_rank(File::A, Rank::_1));
         assert_eq!(Move::new(Square::from_file_rank(File::B, Rank::_2),
                              Square::from_file_rank(File::B, Rank::_3),
                              Piece::None,
                              CastleSide::None,
                              false)
-                       .from_sq(),
+                       .sq_from(),
                    Square::from_file_rank(File::B, Rank::_2));
         assert_eq!(Move::new(Square::from_file_rank(File::H, Rank::_8),
                              Square::from_file_rank(File::G, Rank::_6),
                              Piece::None,
                              CastleSide::None,
                              false)
-                       .from_sq(),
+                       .sq_from(),
                    Square::from_file_rank(File::H, Rank::_8));
     }
 
     #[test]
-    fn move_to_sq() {
+    fn move_sq_to() {
         assert_eq!(Move::new(Square::from_file_rank(File::A, Rank::_2),
                              Square::from_file_rank(File::A, Rank::_1),
                              Piece::None,
                              CastleSide::None,
                              false)
-                       .to_sq(),
+                       .sq_to(),
                    Square::from_file_rank(File::A, Rank::_1));
         assert_eq!(Move::new(Square::from_file_rank(File::B, Rank::_3),
                              Square::from_file_rank(File::B, Rank::_2),
                              Piece::None,
                              CastleSide::None,
                              false)
-                       .to_sq(),
+                       .sq_to(),
                    Square::from_file_rank(File::B, Rank::_2));
         assert_eq!(Move::new(Square::from_file_rank(File::G, Rank::_6),
                              Square::from_file_rank(File::H, Rank::_8),
                              Piece::None,
                              CastleSide::None,
                              false)
-                       .to_sq(),
+                       .sq_to(),
                    Square::from_file_rank(File::H, Rank::_8));
     }
 

@@ -25,7 +25,7 @@
 //!
 //! Later it should also contain Magic Moves details and basic endgame tablebase.
 
-use std::collections::LinkedList;
+use std::collections::VecDeque;
 use std::fmt;
 use std::iter::*;
 
@@ -47,7 +47,7 @@ impl Bitboard {
         Bitboard(1 << sq.0)
     }
 
-    pub fn from_squares(squares: &LinkedList<Square>) -> Bitboard {
+    pub fn from_squares(squares: &VecDeque<Square>) -> Bitboard {
         let val = squares.iter().fold(0u64, |acc, &sq| acc | (1 << sq.0));
         Bitboard(val)
     }
@@ -118,7 +118,7 @@ impl Iterator for Bitboard {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::LinkedList;
+    use std::collections::VecDeque;
     use std::panic;
     use std::vec::*;
 
@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn bitboard_from_squares() {
-        let mut squares = LinkedList::new();
+        let mut squares = VecDeque::new();
         {
             assert_eq!(Bitboard(0), Bitboard::from_squares(&squares));
         }
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn bitboard_display() {
-        let mut squares = LinkedList::new();
+        let mut squares = VecDeque::new();
         {
             assert_eq!(format!("{}", Bitboard::from_squares(&squares)).len(),
                        BITBOARD_STRING_SIZE);
